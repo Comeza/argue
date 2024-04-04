@@ -2,14 +2,14 @@ use axum::routing::{get, get_service};
 use axum::Router;
 use tower_http::services::ServeDir;
 
-mod ai;
+use crate::config::Config;
+
+pub mod ai;
 mod config;
 mod model;
-mod openai;
+// mod openai;
 mod routes;
-mod socket_handler;
-
-pub use config::*;
+// mod socket_handler;
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
@@ -27,7 +27,7 @@ async fn main() -> std::io::Result<()> {
     let static_service = ServeDir::new(config.serve_dir);
 
     let app = Router::new()
-        .route("/api/create", get(routes::create_game))
+        .route("/game/create", get(routes::create_game))
         // .route("/ws", get(socket_handler::ws_route_handler))
         .nest_service("/", get(get_service(static_service)));
 

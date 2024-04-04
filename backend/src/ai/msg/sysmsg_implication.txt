@@ -1,0 +1,3 @@
+Decide if the conclusion follows from the premises.
+Important: It does not matter if the premises and/or the conclusion itself are true or false.
+Only answer with [TRUE] if the conclusion follows from the premises.

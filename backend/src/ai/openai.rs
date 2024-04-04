@@ -1,39 +1,27 @@
+use std::time::Instant;
+
 use reqwest::{self};
 use serde::{Deserialize, Serialize};
 
-use super::AiApi;
+use super::limiter::TokenLimiter;
+use super::{AiApi, AiError};
 
-struct OpenAi {
+pub struct OpenAi {
     model: String,
     token: String,
     endpoint: String,
+    limiter: TokenLimiter,
 }
 
-pub enum OpenAiError {
-    NoChoices,
-    WrongFormat,
-    RewestError(reqwest::Error),
-}
+impl OpenAi {
+    async fn request(&mut self, msgs: Vec<Message>) -> Result<String, AiError> {
+        if self.is_rate_limited() {
+            return Err(AiError::Ratelimited);
+        }
 
-impl From<reqwest::Error> for OpenAiError {
-    fn from(error: reqwest::Error) -> Self {
-        Self::RewestError(error)
-    }
-}
-
-const OPENAI_SYSTEM_MESSAGE: &'static str = include_str!("system_message.txt");
-
-impl AiApi for OpenAi {
-    type AiError = OpenAiError;
-
-    fn rate_limit(&self) -> u32 {
-        todo!()
-    }
-
-    async fn request(&mut self, input: String) -> Result<String, Self::AiError> {
-        let request = OpenAiRequest::new(&self.model)
-            .append_message(Role::System, OPENAI_SYSTEM_MESSAGE)
-            .append_message(Role::User, input);
+        let request = msgs.into_iter().fold(OpenAiRequest::new(&self.model), |a, c| {
+            a.append_message(c.role, c.content)
+        });
 
         let response = reqwest::Client::new()
             .post(&self.endpoint)
@@ -45,16 +33,46 @@ impl AiApi for OpenAi {
             .await?;
 
         if response.choices.is_empty() {
-            return Err(OpenAiError::NoChoices);
+            return Err(AiError::NoChoices);
         }
 
         let content = response.choices.get(0).unwrap().message.content.to_owned();
-
-        if !content.starts_with("[TRUE]") || !content.starts_with("[FALSE]") {
-            return Err(OpenAiError::WrongFormat);
-        }
-
         Ok(content)
+    }
+}
+
+impl AiApi for OpenAi {
+    fn is_rate_limited(&self) -> bool {
+        self.limiter.is_limited()
+    }
+
+    fn rate_limit_till(&self) -> Instant {
+        todo!()
+    }
+
+    async fn check_fact(&mut self, input: String) -> Result<bool, AiError> {
+        let msgs = vec![Message::sys(super::SYSTEM_MESSAGE_PRE), Message::user(input)];
+        let response = self.request(msgs).await?;
+        Self::interprete_response(&response)
+    }
+
+    async fn check_implication(&mut self, premises: Vec<String>, conclusions: Vec<String>) -> Result<bool, AiError> {
+        let mut msgs = vec![Message::sys(super::SYSTEM_MESSAGE_PRE)];
+
+        premises
+            .into_iter()
+            .map(|msg| Message::user(format!("- {msg}")))
+            .for_each(|m| msgs.push(m));
+
+        msgs.push(Message::user(super::IMPLICATION_MID));
+
+        conclusions
+            .into_iter()
+            .map(|msg| Message::user(format!("- {msg}")))
+            .for_each(|m| msgs.push(m));
+
+        let response = self.request(msgs).await?;
+        Self::interprete_response(&response)
     }
 }
 
@@ -72,6 +90,7 @@ impl OpenAiRequest {
             role,
             content: msg.into(),
         });
+
         self
     }
 
@@ -107,6 +126,22 @@ enum Role {
 struct Message {
     role: Role,
     content: String,
+}
+
+impl Message {
+    pub fn new(role: Role, msg: impl Into<String>) -> Self {
+        Self {
+            role,
+            content: msg.into(),
+        }
+    }
+    pub fn user(msg: impl Into<String>) -> Self {
+        Self::new(Role::User, msg)
+    }
+
+    pub fn sys(msg: impl Into<String>) -> Self {
+        Self::new(Role::System, msg)
+    }
 }
 
 #[derive(Deserialize, Debug)]

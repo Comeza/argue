@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 
-use serde::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Config {
@@ -14,7 +13,7 @@ pub struct Config {
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct EndpointConfig {
-    pub disabled: bool,
+    pub enabled: bool,
     pub token: String,
     pub endpoint: String,
     pub rate_limit: Option<u32>,
@@ -23,7 +22,7 @@ pub struct EndpointConfig {
 impl Default for EndpointConfig {
     fn default() -> Self {
         Self {
-            disabled: true,
+            enabled: false,
             token: String::new(),
             endpoint: String::new(),
             rate_limit: Some(0),
@@ -36,7 +35,8 @@ impl Default for Config {
         Self {
             address: "0.0.0.0:3000".into(),
             serve_dir: "argue-react/dist".into(),
-            ..Default::default()
+            google_gemini: Default::default(),
+            openai: Default::default(),
         }
     }
 }

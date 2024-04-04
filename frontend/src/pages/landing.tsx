@@ -3,7 +3,7 @@ import { FormEvent } from "react";
 
 const onSubmit = (e: FormEvent<HTMLFormElement>) => {
   e.preventDefault();
-  const formData = new FormData(e.currentTarget);
+  // const formData = new FormData(e.currentTarget);
 };
 
 export function LandingPage() {

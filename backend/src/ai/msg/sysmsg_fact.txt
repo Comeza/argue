@@ -1,0 +1,1 @@
+Evaluate if the given statement is objectively true. In this case, begin your answer with [TRUE].
